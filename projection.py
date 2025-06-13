@@ -1,106 +1,97 @@
 import pygame
 import numpy as np
-from math import *
+from math import sin, cos
 
+# Colors
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 BLACK = (0, 0, 0)
 
+# Screen setup
 WIDTH, HEIGHT = 800, 600
-pygame.display.set_caption("3D projection in pygame!")
+pygame.init()
+pygame.display.set_caption("3D Projection in Pygame!")
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
+# Cube setup
 scale = 100
-
-circle_pos = [WIDTH/2, HEIGHT/2]  # x, y
-
+circle_pos = [WIDTH // 2, HEIGHT // 2]  # Center of screen
 angle = 0
 
-points = []
+# Cube vertices
+points = [
+    np.matrix([-1, -1,  1]),
+    np.matrix([ 1, -1,  1]),
+    np.matrix([ 1,  1,  1]),
+    np.matrix([-1,  1,  1]),
+    np.matrix([-1, -1, -1]),
+    np.matrix([ 1, -1, -1]),
+    np.matrix([ 1,  1, -1]),
+    np.matrix([-1,  1, -1])
+]
 
-# all the cube vertices
-points.append(np.matrix([-1, -1, 1]))
-points.append(np.matrix([1, -1, 1]))
-points.append(np.matrix([1,  1, 1]))
-points.append(np.matrix([-1, 1, 1]))
-points.append(np.matrix([-1, -1, -1]))
-points.append(np.matrix([1, -1, -1]))
-points.append(np.matrix([1, 1, -1]))
-points.append(np.matrix([-1, 1, -1]))
-
-
+# Simple orthographic projection matrix
 projection_matrix = np.matrix([
     [1, 0, 0],
     [0, 1, 0]
 ])
 
-
-projected_points = [
-    [n, n] for n in range(len(points))
-]
-
+projected_points = [[0, 0] for _ in range(len(points))]
 
 def connect_points(i, j, points):
-    pygame.draw.line(
-        screen, BLACK, (points[i][0], points[i][1]), (points[j][0], points[j][1]))
-
+    pygame.draw.line(screen, BLACK, (int(points[i][0]), int(points[i][1])), (int(points[j][0]), int(points[j][1])))
 
 clock = pygame.time.Clock()
-while True:
-
+running = True
+while running:
     clock.tick(60)
+    screen.fill(WHITE)
 
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                pygame.quit()
-                exit()
+        if event.type == pygame.QUIT or (
+            event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            running = False
 
-    # update stuff
-
+    # Rotation matrices
     rotation_z = np.matrix([
         [cos(angle), -sin(angle), 0],
-        [sin(angle), cos(angle), 0],
-        [0, 0, 1],
+        [sin(angle),  cos(angle), 0],
+        [0, 0, 1]
     ])
 
     rotation_y = np.matrix([
         [cos(angle), 0, sin(angle)],
         [0, 1, 0],
-        [-sin(angle), 0, cos(angle)],
+        [-sin(angle), 0, cos(angle)]
     ])
 
     rotation_x = np.matrix([
         [1, 0, 0],
         [0, cos(angle), -sin(angle)],
-        [0, sin(angle), cos(angle)],
+        [0, sin(angle),  cos(angle)]
     ])
-    angle += 0.01
 
-    screen.fill(WHITE)
-    # drawining stuff
+    # Apply transformations
+    for i, point in enumerate(points):
+        rotated = rotation_z @ point.reshape((3, 1))
+        rotated = rotation_y @ rotated
+        rotated = rotation_x @ rotated
 
-    i = 0
-    for point in points:
-        rotated2d = np.dot(rotation_z, point.reshape((3, 1)))
-        rotated2d = np.dot(rotation_y, rotated2d)
-        rotated2d = np.dot(rotation_x, rotated2d)
+        projected2d = projection_matrix @ rotated
 
-        projected2d = np.dot(projection_matrix, rotated2d)
-
-        x = int(projected2d[0][0] * scale) + circle_pos[0]
-        y = int(projected2d[1][0] * scale) + circle_pos[1]
+        x = int(projected2d[0, 0] * scale + circle_pos[0])
+        y = int(projected2d[1, 0] * scale + circle_pos[1])
 
         projected_points[i] = [x, y]
         pygame.draw.circle(screen, RED, (x, y), 5)
-        i += 1
 
-    for p in range(4):
-        connect_points(p, (p+1) % 4, projected_points)
-        connect_points(p+4, ((p+1) % 4) + 4, projected_points)
-        connect_points(p, (p+4), projected_points)
+    # Connect cube edges
+    for i in range(4):
+        connect_points(i, (i + 1) % 4, projected_points)
+        connect_points(i + 4, ((i + 1) % 4) + 4, projected_points)
+        connect_points(i, i + 4, projected_points)
 
     pygame.display.update()
+    angle += 0.01
+
+pygame.quit()
